@@ -80,7 +80,10 @@ class TestWebhookAsyncHandling:
         raw_body = json.dumps(SAMPLE_PAYLOAD).encode()
         signature = _sign(raw_body, "test-app-secret")
 
-        with patch("app.api.routers.webhook._process_message", new=AsyncMock(side_effect=lambda *a, **k: _never_resolve())):
+        enqueue = AsyncMock(return_value=({"_id": "job-1"}, True))
+        with patch("app.api.routers.webhook.JobRepository") as repo_cls:
+            repo_cls.return_value.enqueue = enqueue
+            app.state.db = object()
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
                     "/api/webhooks/whatsapp",
@@ -89,6 +92,7 @@ class TestWebhookAsyncHandling:
                 )
 
         assert response.status_code == 200
+        enqueue.assert_awaited_once()
 
     async def test_rejects_invalid_signature(self):
         raw_body = json.dumps(SAMPLE_PAYLOAD).encode()

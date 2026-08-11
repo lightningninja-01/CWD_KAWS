@@ -6,6 +6,7 @@ Campaign Drawer.
 import asyncio
 
 from app.database.repositories.customer_repository import CustomerRepository
+from app.database.repositories.tenant_repository import TenantRepository
 from app.exceptions.custom_exceptions import MetaAPIError
 from app.schemas.broadcast_schema import BroadcastRequest, BroadcastResult
 from app.services.whatsapp_client import WhatsAppClient
@@ -18,11 +19,17 @@ _MAX_CONCURRENT_SENDS = 10
 
 
 class BroadcastService:
-    def __init__(self, customer_repo: CustomerRepository, whatsapp_client: WhatsAppClient) -> None:
+    def __init__(
+        self, customer_repo: CustomerRepository, whatsapp_client: WhatsAppClient,
+        tenant_repo: TenantRepository | None = None,
+    ) -> None:
         self._customer_repo = customer_repo
         self._whatsapp_client = whatsapp_client
+        self._tenant_repo = tenant_repo
 
     async def send_broadcast(self, request: BroadcastRequest) -> BroadcastResult:
+        tenant = await self._tenant_repo.get_by_id(request.tenant_id) if self._tenant_repo else None
+        phone_number_id = tenant.phone_number_id if tenant else None
         resolved_customers = []
         tags_to_query = []
 
@@ -52,7 +59,9 @@ class BroadcastService:
         async def _send_one(phone: str) -> bool:
             async with semaphore:
                 try:
-                    await self._whatsapp_client.send_template(phone, request.template_name, request.template_params)
+                    await self._whatsapp_client.send_template(
+                        phone, request.template_name, request.template_params, phone_number_id=phone_number_id
+                    )
                     return True
                 except MetaAPIError as exc:
                     log.warning(f"Broadcast send failed for {phone}: {exc.message} - Body: {exc.response_body}")

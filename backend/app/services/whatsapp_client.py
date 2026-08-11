@@ -26,10 +26,12 @@ class WhatsAppClient:
         settings = get_settings()
         self._phone_number_id = settings.meta_phone_number_id
         self._base_url = settings.graph_api_base_url
-        self._headers = {
-            "Authorization": f"Bearer {settings.meta_access_token}",
-            "Content-Type": "application/json",
-        }
+        self._default_access_token = settings.meta_access_token
+        self._access_tokens = settings.meta_access_tokens
+
+    def _headers_for(self, phone_number_id: str | None = None) -> dict[str, str]:
+        token = self._access_tokens.get(phone_number_id or "", self._default_access_token)
+        return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     async def _post(self, payload: dict, *, phone_number_id: str | None = None) -> dict:
         outbound_phone_number_id = phone_number_id or self._phone_number_id
@@ -39,7 +41,7 @@ class WhatsAppClient:
         async with httpx.AsyncClient(timeout=10.0) as client:
             for attempt in range(1, _MAX_RETRIES + 1):
                 try:
-                    response = await client.post(url, headers=self._headers, json=payload)
+                    response = await client.post(url, headers=self._headers_for(outbound_phone_number_id), json=payload)
                     if response.status_code >= 500:
                         raise MetaAPIError(
                             f"Meta API server error (status {response.status_code})",
@@ -130,7 +132,9 @@ class WhatsAppClient:
         }, phone_number_id=phone_number_id)
         return _extract_message_id(result)
 
-    async def send_template(self, to_phone: str, template_name: str, params: list[str]) -> str:
+    async def send_template(
+        self, to_phone: str, template_name: str, params: list[str], *, phone_number_id: str | None = None
+    ) -> str:
         """Used by the broadcast service; WhatsApp requires pre-approved templates for outbound-initiated messages."""
         components = [{"type": "body", "parameters": [{"type": "text", "text": p} for p in params]}] if params else []
         result = await self._post({
@@ -143,7 +147,7 @@ class WhatsAppClient:
                 "language": {"code": "en_US"},
                 "components": components,
             },
-        })
+        }, phone_number_id=phone_number_id)
         return _extract_message_id(result)
 
     async def fetch_media_url(self, media_id: str) -> str:

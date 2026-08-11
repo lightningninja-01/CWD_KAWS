@@ -4,6 +4,7 @@ uvicorn[standard]==0.32.1
 
 # --- Database (async MongoDB) ---
 motor==3.6.0
+mongomock-motor==0.0.34
 
 # --- Config & validation ---
 pydantic==2.9.2

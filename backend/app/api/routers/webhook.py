@@ -5,9 +5,9 @@ POST /api/webhooks/whatsapp MUST return HTTP 200 within 3 seconds or Meta
 will consider delivery failed and retry, causing duplicate processing.
 To guarantee this regardless of DB or LLM latency, the handler does the
 absolute minimum synchronously (signature verification + payload parsing)
-and hands EVERYTHING else — tenant lookup, session creation, and the full
-LangGraph run — to a background asyncio task. The response is returned
-before any of that work begins.
+and durably enqueues everything else — tenant lookup, session creation, and
+the full LangGraph run — in MongoDB. The response is returned after the
+durable write, without waiting for LLM work.
 """
 from fastapi import APIRouter, Header, Query, Request, Response
 
@@ -16,7 +16,7 @@ from app.graph.state import ConversationState, IncomingMessage
 from app.schemas.webhook_payload import WebhookInboundMessage, WebhookPayload
 from app.utils.logger import get_logger
 from app.utils.signature_verification import verify_meta_signature
-from app.utils.task_registry import task_registry
+from app.database.repositories.job_repository import JobRepository
 from app.config.settings import get_settings
 
 router = APIRouter()
@@ -64,25 +64,26 @@ async def receive_webhook(
 
     inbound_message, phone_number_id = extracted
 
-    # Spawn the entire downstream pipeline (tenant lookup, session, graph)
-    # as a background task and return immediately. This is the crux of the
-    # "never wait for LLM completion" requirement.
-    task_registry.spawn(
-        f"conversation:{inbound_message.id}",
-        _process_message(request, inbound_message, phone_number_id),
-        on_error_log="Conversation processing failed",
+    # Persist before acknowledging Meta. The unique key makes webhook retries safe.
+    jobs = JobRepository(request.app.state.db)
+    await jobs.enqueue(
+        "webhook_message",
+        {"inbound": inbound_message.model_dump(by_alias=True), "phone_number_id": phone_number_id},
+        deduplication_key=f"whatsapp:{inbound_message.id}",
     )
 
     return Response(status_code=200)
 
 
-async def _process_message(request: Request, inbound: WebhookInboundMessage, phone_number_id: str) -> None:
+async def process_queued_message(app, payload: dict) -> None:
     """
     The actual conversation pipeline, run fully in the background — the
     webhook has already responded to Meta by the time this executes.
     """
-    graph_deps = request.app.state.graph_deps
-    compiled_graph = request.app.state.compiled_graph
+    inbound = WebhookInboundMessage.model_validate(payload["inbound"])
+    phone_number_id = payload["phone_number_id"]
+    graph_deps = app.state.graph_deps
+    compiled_graph = app.state.compiled_graph
 
     try:
         tenant = await graph_deps.tenant_repo.get_by_phone_number_id(phone_number_id)

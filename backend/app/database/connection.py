@@ -35,6 +35,11 @@ class MongoConnection:
             await self._ensure_indexes()
             log.info(f"Connected to MongoDB database '{settings.mongodb_db_name}'")
         except Exception as e:
+            if settings.is_production or not settings.allow_in_memory_database:
+                self._client = None
+                self._db = None
+                log.error(f"Failed to connect to MongoDB in production: {type(e).__name__}: {e}")
+                raise
             log.warning(f"Failed to connect to MongoDB ({type(e).__name__}): {e}. Falling back to in-memory mock for development.")
             from mongomock_motor import AsyncMongoMockClient
             self._client = AsyncMongoMockClient()
@@ -65,7 +70,15 @@ class MongoConnection:
         await self._db.tenants.create_index("phone_number_id", unique=True)
         await self._db.sessions.create_index([("tenant_id", 1), ("customer_phone", 1)], unique=True)
         await self._db.messages.create_index([("session_id", 1), ("created_at", -1)])
+        await self._db.messages.create_index(
+            "metadata.meta_message_id",
+            unique=True,
+            partialFilterExpression={"metadata.meta_message_id": {"$type": "string"}},
+            name="unique_meta_message_id",
+        )
         await self._db.customers.create_index([("tenant_id", 1), ("phone_number", 1)], unique=True)
+        await self._db.jobs.create_index("deduplication_key", unique=True, sparse=True)
+        await self._db.jobs.create_index([("status", 1), ("available_at", 1), ("lease_until", 1)])
 
 
 mongo_connection = MongoConnection()

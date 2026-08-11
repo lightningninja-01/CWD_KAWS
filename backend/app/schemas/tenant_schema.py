@@ -3,7 +3,7 @@ API contract schemas for tenant endpoints — decoupled from the Mongo
 document model (models/tenant.py) so the API surface can evolve
 independently of storage shape.
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BrandingSchema(BaseModel):
@@ -16,7 +16,7 @@ class TenantCreateRequest(BaseModel):
     company_name: str
     phone_number_id: str
     system_prompt: str
-    media_library: dict[str, str] = {}
+    media_library: dict[str, str] = Field(default_factory=dict)
     branding: BrandingSchema
 
 

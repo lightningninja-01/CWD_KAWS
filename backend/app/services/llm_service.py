@@ -1,7 +1,7 @@
 """
 LLM service — the agentic decision-making core.
 
-Uses OpenAI's structured outputs (response_format=json_schema) rather than
+Uses Gemini's structured JSON output rather than
 free-text + regex parsing, so the LLM Reasoning node always receives a
 validated ReplyDecision or a clear failure — never a half-parseable string.
 """

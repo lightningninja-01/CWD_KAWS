@@ -3,6 +3,7 @@ Session repository — the hot path for every inbound webhook: given
 (tenant_id, customer_phone), find-or-create the session.
 """
 from datetime import datetime, timezone
+from pymongo import ReturnDocument
 
 from app.database.repositories.base_repository import BaseRepository
 from app.models.session import Session, SessionStatus
@@ -20,16 +21,18 @@ class SessionRepository(BaseRepository[Session]):
         assignment models "session" as the ongoing relationship, not a
         single chat window.
         """
-        doc = await self._collection.find_one({"tenant_id": tenant_id, "customer_phone": customer_phone})
-        if doc is not None:
-            session = self._to_model(doc)
-            if session.status == SessionStatus.RESOLVED:
-                await self.update_status(tenant_id, session.id, SessionStatus.WAITING_FOR_BOT)
-                session.status = SessionStatus.WAITING_FOR_BOT
-            return session
-
         session = Session(tenant_id=tenant_id, customer_phone=customer_phone)
-        return await self.insert(session)
+        doc = await self._collection.find_one_and_update(
+            {"tenant_id": tenant_id, "customer_phone": customer_phone},
+            {"$setOnInsert": session.to_mongo()},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+        result = self._to_model(doc)
+        if result.status == SessionStatus.RESOLVED:
+            await self.update_status(tenant_id, result.id, SessionStatus.WAITING_FOR_BOT)
+            result.status = SessionStatus.WAITING_FOR_BOT
+        return result
 
     async def update_status(self, tenant_id: str, session_id: str, status: SessionStatus) -> bool:
         return await self.update_scoped(

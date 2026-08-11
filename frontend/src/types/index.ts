@@ -64,3 +64,16 @@ export interface BroadcastResult {
   total_failed: number;
   failed_numbers: string[];
 }
+
+export interface BroadcastJob {
+  job_id: string;
+  tenant_id: string;
+  status: "queued" | "running" | "completed" | "failed";
+  created: boolean;
+}
+
+export interface BroadcastJobStatus extends Omit<BroadcastJob, "created"> {
+  attempts: number;
+  result: BroadcastResult | null;
+  last_error: string | null;
+}

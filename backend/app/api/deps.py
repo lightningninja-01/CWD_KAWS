@@ -43,7 +43,6 @@ def get_broadcast_service(
     request: Request,
     customer_repo: CustomerRepository = Depends(get_customer_repo),
 ) -> BroadcastService:
-    return BroadcastService(customer_repo, request.app.state.whatsapp_client)
-
+    return BroadcastService(customer_repo, request.app.state.whatsapp_client, TenantRepository(request.app.state.db))
 
 

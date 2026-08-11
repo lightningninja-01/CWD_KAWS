@@ -23,13 +23,23 @@ export function BroadcastDrawer({ isOpen, onClose }: BroadcastDrawerProps) {
     setError(null);
     setResult(null);
     try {
-      const outcome = await api.sendBroadcast({
+      const job = await api.sendBroadcast({
         tenant_id: activeTenant.id,
         target_tags: tagsInput.split(",").map((t) => t.trim()).filter(Boolean),
         template_name: templateName.trim(),
         template_params: paramsInput.split(",").map((p) => p.trim()).filter(Boolean),
       });
-      setResult(outcome);
+      const deadline = Date.now() + 120_000;
+      while (Date.now() < deadline) {
+        const status = await api.getBroadcastStatus(activeTenant.id, job.job_id);
+        if (status.status === "completed" && status.result) {
+          setResult(status.result);
+          return;
+        }
+        if (status.status === "failed") throw new Error(status.last_error || "Broadcast job failed");
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      }
+      throw new Error("Broadcast is still processing. Check again shortly.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Broadcast failed to send");
     } finally {

@@ -4,13 +4,8 @@ In-process asyncio task registry.
 Used for two things that need explicit lifecycle control:
 1. The typing indicator heartbeat (started in Acknowledge, must be
    cancelled the instant Dispatcher/Handover sends the real reply).
-2. The top-level LangGraph execution task spawned by the webhook handler
-   (tracked so we can log/observe if one fails, rather than it vanishing
-   as an unawaited task exception).
-
-This is intentionally simple (a dict keyed by an arbitrary string key) —
-see the architecture discussion for why we chose in-process asyncio over a
-durable queue like Redis/Arq for this project's scope.
+Webhook and broadcast work use the durable Mongo job queue; this registry is
+intentionally limited to ephemeral typing indicators.
 """
 import asyncio
 from typing import Coroutine
