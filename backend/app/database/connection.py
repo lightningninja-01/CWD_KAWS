@@ -70,12 +70,16 @@ class MongoConnection:
         await self._db.tenants.create_index("phone_number_id", unique=True)
         await self._db.sessions.create_index([("tenant_id", 1), ("customer_phone", 1)], unique=True)
         await self._db.messages.create_index([("session_id", 1), ("created_at", -1)])
-        await self._db.messages.create_index(
-            "metadata.meta_message_id",
-            unique=True,
-            partialFilterExpression={"metadata.meta_message_id": {"$type": "string"}},
-            name="unique_meta_message_id",
-        )
+        # Historical deployments may already contain repeated webhook records.
+        # Preserve that audit history instead of making startup destructive. New
+        # webhook deliveries are deduplicated before processing by the unique
+        # jobs.deduplication_key index.
+        message_indexes = await self._db.messages.index_information()
+        if "unique_meta_message_id" not in message_indexes:
+            await self._db.messages.create_index(
+                "metadata.meta_message_id",
+                name="meta_message_id_lookup",
+            )
         await self._db.customers.create_index([("tenant_id", 1), ("phone_number", 1)], unique=True)
         await self._db.jobs.create_index("deduplication_key", unique=True, sparse=True)
         await self._db.jobs.create_index([("status", 1), ("available_at", 1), ("lease_until", 1)])

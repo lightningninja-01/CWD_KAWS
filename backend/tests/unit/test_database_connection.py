@@ -10,6 +10,9 @@ class FakeCollection:
     async def create_index(self, *args, **kwargs):
         return None
 
+    async def index_information(self):
+        return {}
+
 
 class FakeDatabase:
     def __init__(self):
