@@ -37,9 +37,10 @@ class Settings(BaseSettings):
     # --- CORS ---
     # Comma-separated origins in the env var, e.g. "https://app.example.com,http://localhost:5173"
     cors_allowed_origins: str = Field(
-        default="http://localhost:5173,http://localhost:4173,https://krid-kaws-1.onrender.com"
+        default="http://localhost:5173,http://localhost:4173,https://krid-kaws-frontend.onrender.com"
     )
-    cors_allowed_origin_regex: str | None = Field(default=r"https://.*\.onrender\.com")
+    # Specific subdomain pattern only — no open wildcard. Set to empty string to disable.
+    cors_allowed_origin_regex: str | None = Field(default=None)
 
     # --- MongoDB ---
     mongodb_uri: str = Field(..., description="MongoDB Atlas connection string")
