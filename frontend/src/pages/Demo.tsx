@@ -139,11 +139,17 @@ export function Demo() {
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
-          <div className="mt-3 flex items-center">
+          <div className="mt-3 flex items-center justify-between">
             <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wider">
               <svg className="mr-1.5 h-2 w-2 text-amber-500 animate-pulse" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
               Sandbox Mode
             </span>
+            <a 
+              href="/admin"
+              className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-md bg-gray-900 text-white hover:bg-gray-800 transition-colors shadow-sm"
+            >
+              Open Admin &rarr;
+            </a>
           </div>
         </div>
         
