@@ -32,18 +32,25 @@ class JobWorker:
     async def _run(self) -> None:
         settings = get_settings()
         while not self._stop.is_set():
-            job = await self._repo.claim_next(settings.job_lease_seconds)
-            if job is None:
-                await asyncio.sleep(settings.job_poll_interval_seconds)
-                continue
             try:
-                result = await self._execute(job)
-                await self._repo.complete(job["_id"], result)
+                job = await self._repo.claim_next(settings.job_lease_seconds)
+                if job is None:
+                    await asyncio.sleep(settings.job_poll_interval_seconds)
+                    continue
+
+                try:
+                    result = await self._execute(job)
+                    await self._repo.complete(job["_id"], result)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:  # top-level durable job boundary
+                    log.error(f"Job {job['_id']} ({job['type']}) failed: {exc!r}", exc_info=True)
+                    await self._repo.fail(job, repr(exc), settings.job_max_attempts)
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:  # top-level durable job boundary
-                log.error(f"Job {job['_id']} ({job['type']}) failed: {exc!r}", exc_info=True)
-                await self._repo.fail(job, repr(exc), settings.job_max_attempts)
+            except Exception as exc:
+                log.error(f"JobWorker loop error (e.g. DB connection lost): {exc!r}. Retrying in 5s...")
+                await asyncio.sleep(5.0)
 
     async def _execute(self, job: dict) -> dict:
         if job["type"] == "webhook_message":
