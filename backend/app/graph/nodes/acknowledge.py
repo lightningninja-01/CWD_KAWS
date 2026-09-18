@@ -53,8 +53,9 @@ def build_acknowledge_node(deps: GraphDependencies):
         # Fire read receipt + typing ON. Failure here is logged but never
         # fatal — a missed typing indicator shouldn't block the reply.
         try:
-            await deps.whatsapp_client.mark_as_read(incoming.meta_message_id, phone_number_id=phone_number_id)
-            await deps.typing_heartbeat.start(session_id, incoming.meta_message_id, phone_number_id)
+            if incoming.channel == "whatsapp":
+                await deps.whatsapp_client.mark_as_read(incoming.meta_message_id, phone_number_id=phone_number_id)
+                await deps.typing_heartbeat.start(session_id, incoming.meta_message_id, phone_number_id)
         except Exception as exc:  # noqa: BLE001 — intentionally broad; this must never crash the graph
             node_log.warning(f"Read receipt / typing indicator failed (non-fatal): {exc!r}")
 
@@ -62,5 +63,6 @@ def build_acknowledge_node(deps: GraphDependencies):
         return {"inbound_message_doc_id": inbound_doc.id}
 
     return acknowledge
+
 
 
