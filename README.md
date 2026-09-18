@@ -1,167 +1,92 @@
-# Multi-Tenant WhatsApp AI SaaS
+# AIONOS: Multi-Tenant Omni-Channel AI SaaS
 
-A production-oriented, multi-tenant WhatsApp & Gmail Support & Sales agent. Built with **FastAPI + LangGraph + Groq (Llama 3)** on the backend and a **React + Tailwind** monitoring dashboard on the frontend, backed by **MongoDB Atlas**.
+Welcome to **AIONOS**! If you are looking at this project for the first time, this guide will explain exactly what AIONOS is, what it does, and how to get it running from scratch.
+
+AIONOS is a production-ready, autonomous AI agent built for customer support and sales. Instead of a simple chatbot, AIONOS acts as a proactive digital employee for multiple businesses at once. Built with **FastAPI + LangGraph + Groq (Llama 3)** on the backend and a **React + Tailwind** dashboard on the frontend.
 
 ![Architecture diagram](docs/architecture-diagram.svg)
 
-## Table of contents
-- [Quick start](#quick-start)
-- [Environment variables](#environment-variables)
-- [Running locally](#running-locally)
-- [LangGraph architecture](#langgraph-architecture)
-- [Project structure](#project-structure)
-- [Deployment (Render)](#deployment-render)
-- [Bonus features implemented](#bonus-features-implemented)
+## 🌟 What can AIONOS do?
+* **Omni-Channel Communication:** Customers can text the business on **WhatsApp** or send an email via **Gmail**. The AIONOS agent seamlessly reads, reasons, and replies on the exact same channel the customer used.
+* **Autonomous Calendar Scheduling:** AIONOS connects directly to Google Calendar via OAuth. If a customer asks to book a meeting, AIONOS checks the business\'s availability, books the time slot, and automatically invites the customer.
+* **Blazing Fast AI:** Powered by Llama 3 via Groq, providing near-instantaneous reasoning and responses.
+* **Human Handover:** AIONOS monitors customer sentiment. If a customer gets frustrated or explicitly asks for a human, the AI stops replying and flags the conversation in red so a real person can step in.
+* **Live Admin Dashboard:** A beautiful React-based control center where business owners can watch the AI talk to customers in real-time, view chat histories, and broadcast messages.
 
-## Quick start
+---
 
-1. Clone the repo and `cd` into it.
-2. Copy env templates and fill them in (see [Environment variables](#environment-variables)):
-   ```bash
-   cp backend/.env.example backend/.env
-   cp frontend/.env.example frontend/.env
-   ```
-3. Seed the two demo tenants (Luxury Furniture Co. and Automotive Care Center):
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   python -m scripts.seed_db
-   ```
-4. Run locally with Docker Compose, or manually — see [Running locally](#running-locally).
-5. Point your Meta App's webhook at `https://<your-backend-url>/api/webhooks/whatsapp`.
+## 🚀 Setup From Scratch
 
-## Environment variables
+### Step 1: Gather Your API Keys
+You will need a few free accounts to make this work:
+1. **MongoDB Atlas:** Create a free cluster and get your connection string (\MONGODB_URI\).
+2. **Groq:** Go to console.groq.com to get your ultra-fast API key (\GROQ_API_KEY\).
+3. **Google Cloud Console:** Create an OAuth 2.0 Client ID to get your \GOOGLE_CLIENT_ID\ and \GOOGLE_CLIENT_SECRET\.
+4. **Meta Developers:** Create a WhatsApp app to get your \META_ACCESS_TOKEN\ and \META_PHONE_NUMBER_ID\.
 
-All backend config lives in `backend/.env` (see `backend/.env.example` for the annotated list). Key ones:
+### Step 2: Configure the Backend
+1. Open your terminal, clone the repo, and navigate to the backend:
+   \\ash
+   git clone https://github.com/lightningninja-01/krid_KAWS.git
+   cd krid_KAWS/backend
+   \2. Copy the environment template and open it:
+   \\ash
+   cp .env.example .env
+   \3. Fill in the keys you gathered in Step 1 into the \.env\ file.
 
-| Variable | Purpose |
-|---|---|
-| `MONGODB_URI` | Atlas connection string (M0 free tier is enough) |
-| `GROQ_API_KEY` | API key for Groq's blazing fast inference (Llama 3 models) |
-| `GOOGLE_CLIENT_ID` / `SECRET` | OAuth credentials for Gmail and Calendar integration |
-| `META_APP_SECRET` | Verifies `X-Hub-Signature-256` on inbound webhooks |
-| `META_WEBHOOK_VERIFY_TOKEN` | Used in Meta's GET webhook verification handshake |
-| `META_ACCESS_TOKEN` / `META_PHONE_NUMBER_ID` | Auth for outbound Graph API calls |
-| `AUTH_DISABLED` / `ADMIN_API_KEY` | Dashboard authentication; production requires auth and a 32+ character key |
-| `TENANT_API_KEYS_JSON` | Maps tenant-scoped dashboard keys to permitted tenant IDs |
-| `META_ACCESS_TOKENS_JSON` | Optional phone-number-specific Meta credentials |
-| `HANDOVER_SENTIMENT_THRESHOLD` | 0.0–1.0; sentiment score above this triggers human handover |
-
-Frontend needs one variable, in `frontend/.env`:
-
-| Variable | Purpose |
-|---|---|
-| `VITE_API_BASE_URL` | Base URL of the backend API |
-
-## Running locally
-
-Development permits anonymous dashboard access and an in-memory Mongo fallback. Production deliberately refuses to start unless `AUTH_DISABLED=false`, `ALLOW_IN_MEMORY_DATABASE=false`, a strong `ADMIN_API_KEY` is configured, and CORS is restricted to explicit origins. The production dashboard asks for the key and keeps it only in session storage.
-
-**Option A — Docker Compose (recommended):**
-```bash
-docker compose up --build
-```
-Backend on `http://localhost:8000`, frontend on `http://localhost:5173`.
-
-**Option B — manual:**
-```bash
-# Backend
-cd backend
+### Step 3: Seed the Database
+AIONOS is built for multiple tenants (businesses). Run the setup script to generate the initial demo businesses:
+\\ash
 pip install -r requirements.txt
-uvicorn app.main:app --reload
-
-# Frontend (separate terminal)
-cd frontend
+python -m scripts.seed_db
+\
+### Step 4: Configure the Frontend
+Open a new terminal window and navigate to the frontend:
+\\ash
+cd ../frontend
+cp .env.example .env
 npm install
-npm run dev
-```
+\*(Ensure \VITE_API_BASE_URL\ in your frontend \.env\ points to your backend, e.g., \http://localhost:5000\)*
 
-**Running tests:**
-```bash
+### Step 5: Start the Engines!
+Run both servers to bring AIONOS online:
+
+**Terminal 1 (Backend):**
+\\ash
 cd backend
-pip install -r requirements-dev.txt
-pytest -v
-```
-31 tests covering authorization, durable job behavior, graph nodes, tenant-isolated repositories, WhatsApp retries, and webhook acknowledgment.
+uvicorn app.main:app --reload --port 5000
+\**Terminal 2 (Frontend):**
+\\ash
+cd frontend
+npm run dev
+\
+---
 
-## LangGraph architecture
+## 🖥️ Navigating the Application
 
-Inbound webhook messages are first inserted into the Mongo-backed `jobs` queue using the Meta message ID as a unique deduplication key. The API acknowledges Meta only after that durable write. A leased worker executes the graph, retries transient failures with backoff, and reclaims work abandoned by a crashed process. Broadcasts use the same queue and expose a status endpoint.
+Because AIONOS is a SaaS platform, the frontend has two main areas:
+* **The Public Sandbox (\/demo\ or \/\):** This is the landing page where users can simulate incoming WhatsApp messages to see how the AI reacts.
+* **The Admin Dashboard (\/admin\):** Navigate to \http://localhost:5173/admin\ (or \your-website.com/admin\ in production) to open the live control center. Here you can switch between businesses (tenants), view the live AI chat history, and monitor active sessions!
 
-### State (`app/graph/state.py`)
-A single `ConversationState` TypedDict flows through every node. Each node reads/writes a well-typed slice of it — no ad-hoc dict mutation. `IncomingMessage` and `ReplyDecision` are proper Pydantic models within the state, so the LLM's structured output is validated at the boundary, not trusted blindly.
+---
 
-### Nodes and edges
-```
-Acknowledge → Context Retriever → (conditional: inbound image?)
-                                        ├─ yes → Media Interpreter → LLM Reasoning
-                                        └─ no  ───────────────────→ LLM Reasoning
+## 🏗️ Technical Architecture (For Advanced Users)
 
-LLM Reasoning → (conditional: action type?)
-                     ├─ tool_call → Tool Execution → (loops back to LLM Reasoning)
-                     └─ respond   → (conditional: needs_human?)
-                                         ├─ yes → Handover   → END
-                                         └─ no  → Dispatcher → END
-```
+### LangGraph Workflow
+AIONOS uses LangGraph to orchestrate the AI\'s reasoning loop:
+\Acknowledge -> Context Retriever -> (conditional: inbound image?)
+                                        |- yes -> Media Interpreter -> LLM Reasoning
+                                        |- no  -------------------> LLM Reasoning
 
-- **Acknowledge** — saves the inbound message (`status=PENDING_RESPONSE`) and sends channel-specific read receipts (e.g. WhatsApp typing indicator). 
-- **Context Retriever** — loads the tenant's system prompt, media library, and last 5 messages.
-- **Media Interpreter** *(bonus, conditional)* — only runs for inbound images.
-- **LLM Reasoning** — the agentic core, now powered by **Groq**. Uses OpenAI-compatible tool schemas to decide whether to invoke a tool (like checking Google Calendar) or call `send_reply` to finalize the turn.
-- **Tool Execution** — securely executes the LLM's requested tool (e.g., pulling Google OAuth tokens to check calendar availability) and feeds the result back into the LLM context.
-- **Handover** *(bonus)* — terminal node for escalation. Sends a **fixed** message (never LLM-generated) and sets `session.status = NEEDS_HUMAN`.
-- **Dispatcher** — routes the final LLM response back to the originating channel (WhatsApp or Gmail API), stops the typing heartbeat, and resets session status.
+LLM Reasoning -> (conditional: action type?)
+                     |- tool_call -> Tool Execution -> (loops back to LLM Reasoning)
+                     |- respond   -> (conditional: needs_human?)
+                                         |- yes -> Handover   -> END
+                                         |- no  -> Dispatcher -> END
+\* **Tool Execution:** Securely executes the LLM\'s requested tools (like pulling Google OAuth tokens to check calendar availability) and feeds the result back into the LLM context.
+* **Dispatcher:** Dynamically routes the final LLM response back to the originating channel (WhatsApp or Gmail API).
 
-### Why this shape
-Every node factory closes over a `GraphDependencies` dataclass (repositories + services) rather than reaching for global singletons — keeping nodes testable in isolation without real DB, Meta, or Gemini calls. The graph is **compiled once at startup** and reused for every conversation turn.
-
-## Project structure
-
-```
-whatsapp-ai-saas/
-├── backend/
-│   └── app/
-│       ├── api/routers/        # webhook, tenants, sessions, messages, broadcast
-│       ├── services/           # WhatsApp client, LLM, vision, typing heartbeat
-│       ├── database/repositories/  # tenant-scoped data access
-│       ├── models/ + schemas/  # Mongo document shapes vs. API contracts (kept separate)
-│       ├── graph/               # LangGraph state, nodes, builder
-│       ├── utils/               # logging, signature verification, task registry
-│       └── config/settings.py   # single source of truth for env vars
-├── frontend/
-│   └── src/
-│       ├── components/layout/   # Sidebar, TenantSwitcher
-│       ├── components/chat/     # ChatList, ConversationWindow, MediaPreview, TypingIndicator
-│       ├── components/broadcast/# BroadcastDrawer
-│       └── hooks/ + api/ + store/
-└── docs/architecture-diagram.svg
-```
-
-## Deployment (Render)
-
-Deployed as **two separate Render services** from this one repo:
-
-1. **Backend — Web Service**
-   - Root directory: `backend/`
-   - Environment: Docker (uses `backend/Dockerfile`)
-   - Add all variables from `backend/.env.example` in Render's Environment tab (never commit `.env`)
-   - Render injects `$PORT` automatically — the Dockerfile already respects it, so no changes needed
-2. **Frontend — Static Site**
-   - Root directory: `frontend/`
-   - Build command: `npm install && npm run build`
-   - Publish directory: `dist`
-   - Set `VITE_API_BASE_URL` to the backend service's Render URL
-
-The repository also includes production Dockerfiles for both services and a GitHub Actions workflow that runs backend tests, builds the frontend, and builds both containers. Use `/health` for liveness, `/ready` for Mongo/worker readiness, and `/metrics` for the Prometheus-compatible durable queue gauge.
-
-After both are live, set the backend's URL + `/api/webhooks/whatsapp` as the webhook URL in your Meta App dashboard, using the same value you set for `META_WEBHOOK_VERIFY_TOKEN`.
-
-**Portability note:** the Dockerfile uses shell-form `CMD` with `${PORT}` expansion and no Render-specific assumptions — it runs unmodified on GCP Cloud Run if you prefer that instead.
-
-## Bonus features implemented
-
-- ✅ **Webhook signature validation** — `X-Hub-Signature-256` verified via constant-time HMAC comparison (`app/utils/signature_verification.py`) before any payload processing.
-- ✅ **Inbound media parsing** — GPT-4o vision describes customer-sent images (`app/services/vision_service.py`), folded into the LLM's reasoning context.
-- ✅ **Fallback handover** — sentiment-scored on every turn; crossing `HANDOVER_SENTIMENT_THRESHOLD` routes to a dedicated `Handover` node.
-- ✅ **Omni-Channel Architecture** — Graph operates seamlessly across both WhatsApp and Gmail, dynamically adapting read receipts and dispatch channels.
-- ✅ **AI Calendar Scheduling** — Full Google OAuth flow implemented. The LLM can autonomously check a business's calendar availability and book meetings for customers.
+### Deployment (Render)
+AIONOS deploys easily to Render as two separate services:
+1. **Backend (Web Service):** Point Render to the \ackend/\ directory using the Docker environment. Add all \.env\ variables to Render\'s Environment tab.
+2. **Frontend (Static Site):** Point Render to the \rontend/\ directory. Build command: pm install && npm run build\. Publish directory: \dist\. Add a Rewrite Rule (Source: \/*\, Destination: \/index.html\, Action: \Rewrite\) to ensure the \/admin\ routing works in production.
