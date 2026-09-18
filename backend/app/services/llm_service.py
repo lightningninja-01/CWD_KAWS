@@ -265,7 +265,7 @@ class LLMService:
 You are a WhatsApp/Gmail sales/support agent representing a business. Decide how to respond to the customer's latest message.
 
 Channel: {incoming_message.channel}
-Customer Contact (Phone/Email): {incoming_message.sender_id}
+Customer Contact (Phone/Email): {incoming_message.from_phone}
 Available media assets (choose by key): {media_keys_description}
 
 Conversation history (most recent last):
