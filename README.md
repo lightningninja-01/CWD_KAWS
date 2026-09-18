@@ -1,6 +1,6 @@
 # Multi-Tenant WhatsApp AI SaaS
 
-A production-oriented, multi-tenant WhatsApp Support & Sales agent. Built with **FastAPI + LangGraph + Gemini** on the backend and a **React + Tailwind** monitoring dashboard on the frontend, backed by **MongoDB Atlas**.
+A production-oriented, multi-tenant WhatsApp & Gmail Support & Sales agent. Built with **FastAPI + LangGraph + Groq (Llama 3)** on the backend and a **React + Tailwind** monitoring dashboard on the frontend, backed by **MongoDB Atlas**.
 
 ![Architecture diagram](docs/architecture-diagram.svg)
 
@@ -37,7 +37,8 @@ All backend config lives in `backend/.env` (see `backend/.env.example` for the a
 | Variable | Purpose |
 |---|---|
 | `MONGODB_URI` | Atlas connection string (M0 free tier is enough) |
-| `GEMINI_API_KEY` | Used for both structured reasoning and vision |
+| `GROQ_API_KEY` | API key for Groq's blazing fast inference (Llama 3 models) |
+| `GOOGLE_CLIENT_ID` / `SECRET` | OAuth credentials for Gmail and Calendar integration |
 | `META_APP_SECRET` | Verifies `X-Hub-Signature-256` on inbound webhooks |
 | `META_WEBHOOK_VERIFY_TOKEN` | Used in Meta's GET webhook verification handshake |
 | `META_ACCESS_TOKEN` / `META_PHONE_NUMBER_ID` | Auth for outbound Graph API calls |
@@ -95,17 +96,21 @@ A single `ConversationState` TypedDict flows through every node. Each node reads
 Acknowledge → Context Retriever → (conditional: inbound image?)
                                         ├─ yes → Media Interpreter → LLM Reasoning
                                         └─ no  ───────────────────→ LLM Reasoning
-LLM Reasoning → (conditional: needs_human?)
-                     ├─ yes → Handover  → END
-                     └─ no  → Dispatcher → END
+
+LLM Reasoning → (conditional: action type?)
+                     ├─ tool_call → Tool Execution → (loops back to LLM Reasoning)
+                     └─ respond   → (conditional: needs_human?)
+                                         ├─ yes → Handover   → END
+                                         └─ no  → Dispatcher → END
 ```
 
-- **Acknowledge** — saves the inbound message (`status=PENDING_RESPONSE`), sends the read receipt, flips `session.status` to `AGENT_RESPONDING` (this is what the dashboard's typing indicator polls for), and starts a **typing heartbeat** — WhatsApp's typing indicator expires after ~25s, so a background loop re-sends it every 20s until the reply is dispatched.
+- **Acknowledge** — saves the inbound message (`status=PENDING_RESPONSE`) and sends channel-specific read receipts (e.g. WhatsApp typing indicator). 
 - **Context Retriever** — loads the tenant's system prompt, media library, and last 5 messages.
-- **Media Interpreter** *(bonus, conditional)* — only runs for inbound images; uses GPT-4o vision to describe the image, folded into the LLM's context.
-- **LLM Reasoning** — the agentic core. Uses Gemini structured JSON output to decide `reply_type` (text/image/document), which media key to use, a `sentiment_score`, and `needs_human`. The sentiment threshold is also enforced in code as a backstop.
-- **Handover** *(bonus)* — terminal node for escalation. Sends a **fixed** message (never LLM-generated, deliberately — you don't want a model improvising mid-escalation), sets `session.status = NEEDS_HUMAN`, which the dashboard highlights in red.
-- **Dispatcher** — sends the decided reply via the correct Meta API call, records it, stops the typing heartbeat, resets session status to `WAITING_FOR_BOT`.
+- **Media Interpreter** *(bonus, conditional)* — only runs for inbound images.
+- **LLM Reasoning** — the agentic core, now powered by **Groq**. Uses OpenAI-compatible tool schemas to decide whether to invoke a tool (like checking Google Calendar) or call `send_reply` to finalize the turn.
+- **Tool Execution** — securely executes the LLM's requested tool (e.g., pulling Google OAuth tokens to check calendar availability) and feeds the result back into the LLM context.
+- **Handover** *(bonus)* — terminal node for escalation. Sends a **fixed** message (never LLM-generated) and sets `session.status = NEEDS_HUMAN`.
+- **Dispatcher** — routes the final LLM response back to the originating channel (WhatsApp or Gmail API), stops the typing heartbeat, and resets session status.
 
 ### Why this shape
 Every node factory closes over a `GraphDependencies` dataclass (repositories + services) rather than reaching for global singletons — keeping nodes testable in isolation without real DB, Meta, or Gemini calls. The graph is **compiled once at startup** and reused for every conversation turn.
@@ -157,4 +162,6 @@ After both are live, set the backend's URL + `/api/webhooks/whatsapp` as the web
 
 - ✅ **Webhook signature validation** — `X-Hub-Signature-256` verified via constant-time HMAC comparison (`app/utils/signature_verification.py`) before any payload processing.
 - ✅ **Inbound media parsing** — GPT-4o vision describes customer-sent images (`app/services/vision_service.py`), folded into the LLM's reasoning context.
-- ✅ **Fallback handover** — sentiment-scored on every turn; crossing `HANDOVER_SENTIMENT_THRESHOLD` routes to a dedicated `Handover` node, flips session status to `NEEDS_HUMAN`, and the dashboard highlights that conversation in red.
+- ✅ **Fallback handover** — sentiment-scored on every turn; crossing `HANDOVER_SENTIMENT_THRESHOLD` routes to a dedicated `Handover` node.
+- ✅ **Omni-Channel Architecture** — Graph operates seamlessly across both WhatsApp and Gmail, dynamically adapting read receipts and dispatch channels.
+- ✅ **AI Calendar Scheduling** — Full Google OAuth flow implemented. The LLM can autonomously check a business's calendar availability and book meetings for customers.

@@ -20,6 +20,7 @@ class MessageType(StrEnum):
     TEXT = "text"
     IMAGE = "image"
     DOCUMENT = "document"
+    EMAIL = "email"
 
 
 class MessageStatus(StrEnum):

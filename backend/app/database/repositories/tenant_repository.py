@@ -25,9 +25,12 @@ class TenantRepository:
         return Tenant.model_validate({**doc, "_id": str(doc["_id"])})
 
     async def get_by_id(self, tenant_id: str) -> Tenant:
-        if not ObjectId.is_valid(tenant_id):
-            raise TenantNotFoundError(tenant_id)
-        doc = await self._collection.find_one({"_id": ObjectId(tenant_id)})
+        if ObjectId.is_valid(tenant_id):
+            query = {"_id": ObjectId(tenant_id)}
+        else:
+            query = {"_id": tenant_id}
+            
+        doc = await self._collection.find_one(query)
         model = self._to_model(doc)
         if model is None:
             raise TenantNotFoundError(tenant_id)

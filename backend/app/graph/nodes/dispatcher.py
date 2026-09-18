@@ -30,21 +30,40 @@ def build_dispatcher_node(deps: GraphDependencies):
         error_message: str | None = None
 
         try:
-            if decision.reply_type == "text":
-                meta_id = await deps.whatsapp_client.send_text(customer_phone, decision.text_content, phone_number_id=phone_number_id)
-
-            elif decision.reply_type == "image":
-                url = _resolve_media_url(state["media_library"], decision.media_asset_key, tenant_id)
-                meta_id = await deps.whatsapp_client.send_image(customer_phone, url, caption=decision.text_content, phone_number_id=phone_number_id)
-                media_attachment = MediaAttachment(url=url, mime_type="image/jpeg")
-
-            elif decision.reply_type == "document":
-                url = _resolve_media_url(state["media_library"], decision.media_asset_key, tenant_id)
-                filename = decision.media_asset_key or "document.pdf"
-                meta_id = await deps.whatsapp_client.send_document(
-                    customer_phone, url, filename=filename, caption=decision.text_content, phone_number_id=phone_number_id
+            channel = state.get("channel", "whatsapp")
+            
+            if channel == "gmail":
+                # We are sending an email reply
+                from app.services.tools.gmail_tools import gmail_reply_to_email
+                # For the demo, the user is 'demo_user'
+                user_id = "demo_user" if tenant_id == "demo_tenant" else tenant_id
+                message_id = state["incoming_message"].meta_message_id
+                
+                res = await gmail_reply_to_email(
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    message_id=message_id,
+                    body=decision.text_content
                 )
-                media_attachment = MediaAttachment(url=url, mime_type="application/pdf", filename=filename)
+                meta_id = res.get("message_id")
+            
+            else:
+                # Standard WhatsApp dispatch
+                if decision.reply_type == "text":
+                    meta_id = await deps.whatsapp_client.send_text(customer_phone, decision.text_content, phone_number_id=phone_number_id)
+    
+                elif decision.reply_type == "image":
+                    url = _resolve_media_url(state["media_library"], decision.media_asset_key, tenant_id)
+                    meta_id = await deps.whatsapp_client.send_image(customer_phone, url, caption=decision.text_content, phone_number_id=phone_number_id)
+                    media_attachment = MediaAttachment(url=url, mime_type="image/jpeg")
+    
+                elif decision.reply_type == "document":
+                    url = _resolve_media_url(state["media_library"], decision.media_asset_key, tenant_id)
+                    filename = decision.media_asset_key or "document.pdf"
+                    meta_id = await deps.whatsapp_client.send_document(
+                        customer_phone, url, filename=filename, caption=decision.text_content, phone_number_id=phone_number_id
+                    )
+                    media_attachment = MediaAttachment(url=url, mime_type="application/pdf", filename=filename)
 
         except Exception as exc:  # noqa: BLE001 — must not crash; record failure and move on
             node_log.error(f"Dispatch failed: {exc!r}")

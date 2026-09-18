@@ -79,41 +79,77 @@ async def process_queued_message(app, payload: dict) -> None:
     """
     The actual conversation pipeline, run fully in the background — the
     webhook has already responded to Meta by the time this executes.
+    Supports both WhatsApp and Gmail sources natively.
     """
-    inbound = WebhookInboundMessage.model_validate(payload["inbound"])
-    phone_number_id = payload["phone_number_id"]
     graph_deps = app.state.graph_deps
     compiled_graph = app.state.compiled_graph
+    
+    source = payload.get("source", "whatsapp")
+    
+    if source == "gmail":
+        tenant_id = payload["tenant_id"]
+        from_email = payload["from_email"]
+        message_id = payload["message_id"]
+        
+        tenant = await graph_deps.tenant_repo.get_by_id(tenant_id)
+        if not tenant:
+            log.error(f"Tenant {tenant_id} not found for Gmail message {message_id}")
+            return
+            
+        session = await graph_deps.session_repo.get_or_create(tenant.id, from_email)
+        
+        incoming_message = IncomingMessage(
+            meta_message_id=message_id,
+            from_phone=from_email,
+            channel="gmail",
+            message_type="email",
+            text_body=payload.get("text", "")
+        )
+        
+        initial_state: ConversationState = {
+            "tenant_id": tenant.id,
+            "session_id": session.id,
+            "customer_phone": from_email,
+            "phone_number_id": "gmail",  # Placeholder since we don't have a phone number id for gmail
+            "channel": "gmail",
+            "incoming_message": incoming_message,
+        }
+        
+    else:
+        # Standard WhatsApp processing
+        inbound = WebhookInboundMessage.model_validate(payload["inbound"])
+        phone_number_id = payload["phone_number_id"]
+        
+        try:
+            tenant = await graph_deps.tenant_repo.get_by_phone_number_id(phone_number_id)
+        except TenantNotFoundError:
+            log.error(f"No tenant configured for phone_number_id={phone_number_id} — dropping message")
+            return
 
-    try:
-        tenant = await graph_deps.tenant_repo.get_by_phone_number_id(phone_number_id)
-    except TenantNotFoundError:
-        log.error(f"No tenant configured for phone_number_id={phone_number_id} — dropping message")
-        return
+        session = await graph_deps.session_repo.get_or_create(tenant.id, inbound.from_)
 
-    session = await graph_deps.session_repo.get_or_create(tenant.id, inbound.from_)
+        message_type = inbound.type if inbound.type in ("text", "image", "document") else "text"
+        incoming_message = IncomingMessage(
+            meta_message_id=inbound.id,
+            from_phone=inbound.from_,
+            channel="whatsapp",
+            message_type=message_type,
+            text_body=inbound.text.body if inbound.text else None,
+            media_id=(inbound.image or inbound.document).id if (inbound.image or inbound.document) else None,
+            media_mime_type=(inbound.image or inbound.document).mime_type if (inbound.image or inbound.document) else None,
+        )
 
-    message_type = inbound.type if inbound.type in ("text", "image", "document") else "text"
-    incoming_message = IncomingMessage(
-        meta_message_id=inbound.id,
-        from_phone=inbound.from_,
-        message_type=message_type,
-        text_body=inbound.text.body if inbound.text else None,
-        media_id=(inbound.image or inbound.document).id if (inbound.image or inbound.document) else None,
-        media_mime_type=(inbound.image or inbound.document).mime_type if (inbound.image or inbound.document) else None,
-    )
-
-    initial_state: ConversationState = {
-        "tenant_id": tenant.id,
-        "session_id": session.id,
-        "customer_phone": inbound.from_,
-        "phone_number_id": phone_number_id,
-        "incoming_message": incoming_message,
-    }
+        initial_state: ConversationState = {
+            "tenant_id": tenant.id,
+            "session_id": session.id,
+            "customer_phone": inbound.from_,
+            "phone_number_id": phone_number_id,
+            "channel": "whatsapp",
+            "incoming_message": incoming_message,
+        }
 
     log.info(
         f"Starting graph run for tenant={tenant.id} session={session.id} "
-        f"message_type={message_type}"
+        f"channel={initial_state['channel']} message_type={incoming_message.message_type}"
     )
     await compiled_graph.ainvoke(initial_state)
-

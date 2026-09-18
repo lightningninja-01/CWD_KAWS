@@ -14,7 +14,7 @@ from uuid import uuid4
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import broadcast, messages, sessions, tenants, webhook
+from app.api.routers import broadcast, messages, sessions, tenants, webhook, integrations
 from app.config.settings import get_settings
 from app.database.connection import mongo_connection
 from app.database.repositories.message_repository import MessageRepository
@@ -74,10 +74,19 @@ async def lifespan(app: FastAPI):
     app.state.job_worker = job_worker
     job_worker.start()
 
+    # Start Gmail listener worker
+    from app.services.gmail_listener import GmailListener
+    app.state.gmail_listener = GmailListener(app.state.db, job_repo)
+    app.state.gmail_listener.start()
+
     log.info(f"{settings.app_name} started in '{settings.environment}' mode")
     yield
 
-    await job_worker.stop()
+    log.info("Shutting down workers...")
+    if hasattr(app.state, "job_worker"):
+        await app.state.job_worker.stop()
+    if hasattr(app.state, "gmail_listener"):
+        await app.state.gmail_listener.stop()
     await mongo_connection.disconnect()
     log.info("Application shutdown complete")
 
@@ -111,6 +120,7 @@ def create_app() -> FastAPI:
     app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
     app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
     app.include_router(broadcast.router, prefix="/api/broadcast", tags=["broadcast"])
+    app.include_router(integrations.router, prefix="/api/integrations", tags=["integrations"])
 
     @app.get("/")
     async def root_redirect():

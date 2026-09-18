@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     gemini_model: str = Field(default="gemini-2.5-flash")
     gemini_vision_model: str = Field(default="gemini-2.5-flash")
 
+    # --- Groq ---
+    groq_api_key: str | None = Field(default=None, description="Groq API key")
+    groq_model: str = Field(default="openai/gpt-oss-20b")
+
     # --- Meta WhatsApp Cloud API ---
     meta_app_secret: str = Field(..., description="Used to validate X-Hub-Signature-256")
     meta_webhook_verify_token: str = Field(..., description="Used for GET webhook verification challenge")
@@ -60,6 +64,15 @@ class Settings(BaseSettings):
     meta_access_tokens_json: str = Field(default="{}")
     meta_phone_number_id: str = Field(..., description="Default WhatsApp Business phone number ID")
     meta_graph_api_version: str = Field(default="v20.0")
+
+    # --- Google OAuth ---
+    google_client_id: str | None = Field(default=None, description="Google OAuth Client ID")
+    google_client_secret: str | None = Field(default=None, description="Google OAuth Client Secret")
+    google_redirect_uri: str | None = Field(default=None, description="Google OAuth Redirect URI")
+    # Required scopes for Gmail and Calendar
+    google_oauth_scopes: str = Field(
+        default="openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify"
+    )
 
     # --- Typing indicator heartbeat ---
     typing_heartbeat_interval_seconds: int = Field(default=20)

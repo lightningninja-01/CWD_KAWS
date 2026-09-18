@@ -21,11 +21,21 @@ export default {
       },
       animation: {
         "pulse-dot": "pulse-dot 1.4s ease-in-out infinite",
+        "fade-in": "fade-in 0.3s ease-out forwards",
+        "fade-in-up": "fade-in-up 0.4s ease-out forwards",
       },
       keyframes: {
         "pulse-dot": {
           "0%, 80%, 100%": { transform: "scale(0.6)", opacity: "0.4" },
           "40%": { transform: "scale(1)", opacity: "1" },
+        },
+        "fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        "fade-in-up": {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
         },
       },
     },

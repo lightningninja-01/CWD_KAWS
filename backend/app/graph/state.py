@@ -12,31 +12,41 @@ from pydantic import BaseModel, Field
 
 
 class IncomingMessage(BaseModel):
-    """Normalized inbound message — decoupled from Meta's raw webhook shape."""
+    """Normalized inbound message — decoupled from raw webhook shapes."""
 
     meta_message_id: str
-    from_phone: str
-    message_type: Literal["text", "image", "document"]
+    from_phone: str # Will hold email address if channel is gmail
+    channel: Literal["whatsapp", "gmail"] = "whatsapp"
+    message_type: Literal["text", "image", "document", "email"]
     text_body: str | None = None
-    media_id: str | None = None  # Meta's media object ID, used to fetch the actual asset
+    media_id: str | None = None
     media_mime_type: str | None = None
 
 
 class ReplyDecision(BaseModel):
-    """Structured output from the LLM Reasoning node."""
+    """Structured output for the final text/media reply."""
 
     reply_type: Literal["text", "image", "document"]
-    text_content: str = Field(description="The message text. Always populated, even for media replies (used as caption/context).")
-    media_asset_key: str | None = Field(
-        default=None,
-        description="Key into the tenant's media_library dict, if reply_type is image/document.",
-    )
-    sentiment_score: float = Field(
-        ge=0.0, le=1.0,
-        description="0.0 = calm/satisfied, 1.0 = highly frustrated. Used for handover routing.",
-    )
+    text_content: str = Field(description="The message text. Always populated.")
+    media_asset_key: str | None = Field(default=None)
+    sentiment_score: float = Field(ge=0.0, le=1.0, default=0.0)
     needs_human: bool = Field(default=False)
-    reasoning: str = Field(default="", description="Brief internal rationale, logged but never sent to the customer.")
+    reasoning: str = Field(default="")
+
+
+class AgentAction(BaseModel):
+    """Unified action abstraction from the agent."""
+    action_type: Literal["RESPOND", "TOOL_CALL", "HUMAN_APPROVAL", "HANDOVER"]
+    
+    # Populated if action_type == "RESPOND" or "HANDOVER"
+    reply_decision: ReplyDecision | None = None
+    
+    # Populated if action_type == "TOOL_CALL"
+    tool_name: str | None = None
+    tool_args: dict[str, Any] | None = None
+    
+    # Populated if action_type == "HUMAN_APPROVAL"
+    approval_metadata: dict[str, Any] | None = None
 
 
 class DispatchResult(BaseModel):
@@ -46,31 +56,26 @@ class DispatchResult(BaseModel):
 
 
 class ConversationState(TypedDict, total=False):
-    # --- Identity (set once, at graph invocation) ---
     tenant_id: str
     session_id: str
     customer_phone: str
     phone_number_id: str
+    channel: Literal["whatsapp", "gmail"]
 
-    # --- Acknowledge node output ---
     incoming_message: IncomingMessage
     inbound_message_doc_id: str
 
-    # --- Context Retriever node output ---
     tenant_system_prompt: str
     media_library: dict[str, str]
-    history: list[dict[str, Any]]  # serialized recent Message docs, chronological
-
-    # --- Media Interpreter node output (conditional) ---
+    history: list[dict[str, Any]]
+    
+    # --- Tool Execution State ---
+    tool_history: list[dict[str, Any]]  # Tracks tools called during this turn
+    agent_action: AgentAction | None
+    
     media_description: str | None
-
-    # --- LLM Reasoning node output ---
     reply_decision: ReplyDecision
-
-    # --- Dispatcher / Handover node output ---
     dispatch_result: DispatchResult
-
-    # --- Error short-circuit ---
     error: str | None
 
 
