@@ -129,7 +129,7 @@ GMAIL_REPLY_TOOL = _to_groq_tool({
 class LLMService:
     def __init__(self) -> None:
         settings = get_settings()
-        self._client = AsyncGroq(api_key=settings.groq_api_key)
+        self._client = AsyncGroq(api_key=settings.groq_api_key, timeout=15.0)
         self._model = settings.groq_model
         self._handover_threshold = settings.handover_sentiment_threshold
 
