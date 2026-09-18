@@ -55,6 +55,8 @@ async def receive_webhook(
         # so this is safe and correctly signals "rejected, don't retry."
         raise InvalidWebhookSignatureError()
 
+    log.info(f"RAW WEBHOOK PAYLOAD: {raw_body.decode('utf-8')}")
+
     payload = WebhookPayload.model_validate_json(raw_body)
     extracted = payload.extract_first_message()
 
