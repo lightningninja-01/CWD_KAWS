@@ -9,7 +9,7 @@ from pymongo.errors import DuplicateKeyError
 
 class JobRepository:
     def __init__(self, db) -> None:
-        self._collection = db["jobs"]
+        self._collection = db["jobs_v2"]
 
     async def enqueue(
         self, job_type: str, payload: dict[str, Any], *, tenant_id: str | None = None,
