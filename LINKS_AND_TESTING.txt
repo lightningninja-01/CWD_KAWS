@@ -1,0 +1,26 @@
+=================================================
+OMNICHANNEL AGENTIC SAAS - AIONOS SUBMISSION
+=================================================
+Student Name: Ujjwal Prakash Singh
+Student ID: 2301010234
+
+1. SOURCE CODE (EDITOR's VIEW)
+-------------------------------------------------
+GitHub Repository: https://github.com/lightningninja-01/CWD_KAWS
+
+2. LIVE ADMIN DASHBOARD
+-------------------------------------------------
+URL: https://krid-kaws-frontend.onrender.com
+(This is the live frontend where you can view active chat sessions and connected integrations).
+
+3. TESTING THE AGENT (IMPORTANT NOTE)
+-------------------------------------------------
+Please refer to the attached Demonstration Video to see the agent in action.
+
+Because this application uses the official Meta WhatsApp Cloud API in Development/Sandbox mode, Meta restricts the bot from interacting with unverified phone numbers to prevent spam. Therefore, public reviewers cannot text the bot directly without having their personal phone numbers manually whitelisted in the Meta Developer Dashboard.
+
+To bypass this restriction for the purpose of this review, the submitted Demonstration Video shows the full end-to-end flow: 
+- Receiving WhatsApp messages
+- The LangGraph agent detecting intent (Langchain/Groq LLM)
+- The agent autonomously calling tools (booking the event on my Google Calendar)
+- The agent dispatching a successful response back to WhatsApp.

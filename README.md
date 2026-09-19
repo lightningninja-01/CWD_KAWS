@@ -27,8 +27,8 @@ You will need a few free accounts to make this work:
 ### Step 2: Configure the Backend
 1. Open your terminal, clone the repo, and navigate to the backend:
    \\ash
-   git clone https://github.com/lightningninja-01/krid_KAWS.git
-   cd krid_KAWS/backend
+   git clone https://github.com/lightningninja-01/CWD_KAWS.git
+   cd CWD_KAWS/backend
    \2. Copy the environment template and open it:
    \\ash
    cp .env.example .env
