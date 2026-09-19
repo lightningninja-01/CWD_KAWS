@@ -46,17 +46,12 @@ def build_tool_execution_node(deps: GraphDependencies) -> Callable[[Conversation
         tool_args = action.tool_args or {}
         
         tenant_id = state["tenant_id"]
-        # Since we use customer_phone as a proxy for user in this simple setup,
-        # or we might need an actual user_id. For now we will use customer_phone
-        # or maybe the system allows the agent owner to execute on behalf of tenant.
-        # Wait, the prompt says "User-level Google Integration". Let's pass the customer_phone as user_id for now, 
-        # or a hardcoded 'admin' user id if this is the business owner's tools.
-        # Let's assume the tenant is the one who connected OAuth, so user_id = tenant_id for single-user tenants,
-        # or if we have a real user_id we should use it. For WhatsApp webhook, the "user" is the business owner.
-        # So we'll use `tenant_id` as the `user_id` representing the business owner's connection for now.
-        user_id = tenant_id
-        if tenant_id == "demo_tenant":
-            user_id = "demo_user"
+        # For the Showcase MVP: Since the frontend only allows connecting Google to the 
+        # "demo_tenant" / "demo_user", we route all tool executions to this single integration.
+        # Once a real Admin dashboard is built to connect actual tenants, this should revert 
+        # to using the actual tenant_id and user_id.
+        integration_tenant = "demo_tenant"
+        integration_user = "demo_user"
         
         log.info(f"Executing tool {tool_name} with args {tool_args}")
         
@@ -69,7 +64,7 @@ def build_tool_execution_node(deps: GraphDependencies) -> Callable[[Conversation
             func = TOOLS[tool_name]
             
             # Execute
-            result = await func(tenant_id=tenant_id, user_id=user_id, **tool_args)
+            result = await func(tenant_id=integration_tenant, user_id=integration_user, **tool_args)
             
             tool_history.append({
                 "tool_name": tool_name,
