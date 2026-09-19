@@ -155,6 +155,19 @@ export function Demo() {
         
         <div className="p-6 flex-1 overflow-y-auto bg-gray-50/50">
           
+          {/* AIONOS Submission Card */}
+          <div className="mb-6 border border-indigo-100 rounded-xl bg-gradient-to-br from-indigo-50 to-white shadow-sm overflow-hidden">
+            <div className="p-4">
+              <h2 className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">AIONOS Project Submission</h2>
+              <div className="font-bold text-sm text-gray-900 mt-1">
+                Ujjwal Prakash Singh
+              </div>
+              <div className="text-xs text-indigo-700 mt-1 font-mono bg-indigo-100/50 inline-block px-2 py-0.5 rounded">
+                ID: 2301010234
+              </div>
+            </div>
+          </div>
+
           {/* Integrations Module */}
           <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3">Integrations</h2>
           <div className="mb-8 border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
